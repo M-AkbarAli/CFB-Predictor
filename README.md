@@ -99,8 +99,11 @@ streamlit run src/app/main.py
 
 The app will open in your browser where you can:
 - Select outcomes for remaining games
+- Choose simulation mode: Final Rankings or Weekly Rankings
 - View projected CFP rankings
 - See the projected 12-team playoff bracket
+- Analyze team resumes and compare teams
+- View feature importance to understand model decisions
 
 ### Using the API Programmatically
 
@@ -134,12 +137,17 @@ results = engine.simulate_scenario(
 The model uses resume-based features that align with CFP committee criteria:
 
 - **Record**: Wins, losses, win percentage, conference record
-- **Strength of Schedule**: Opponent average win percentage, SOS rank
+- **Strength of Schedule**: Opponent average win percentage, SOS rank, weighted SOS, SOS of SOS
 - **Quality Wins**: Wins vs winning teams, Power 5 teams, Top 25 teams
 - **Bad Losses**: Losses to sub-.500 teams
+- **Record Strength** (2025 Enhancement): Weighted metric rewarding quality wins and minimizing penalty for strong losses
+- **Head-to-Head**: Explicit tracking of wins over ranked teams with post-processing rule
+- **Common Opponents**: Performance vs common opponents with top teams
+- **Game Control**: Subtle dominance metrics (games won by multiple scores)
 - **Conference**: Power 5 status, conference championship
 - **Momentum**: Current win streak, recent game results
 - **Statistics**: Points per game, point differential (used cautiously)
+- **Elo Rating**: Background feature for tie-breaking
 
 ### Model Training
 
@@ -167,9 +175,11 @@ pytest tests/
 ## Limitations
 
 - Model is trained on 4-team era data (2014-2023); committee behavior may evolve in 12-team era
-- Does not account for injuries or player availability
+- Does not account for injuries or player availability (committee explicitly considers this)
 - Conference championship determination is simplified
 - Some edge cases (ties, complex division scenarios) may not be fully handled
+- Common opponents analysis is simplified (only compares vs top 25 teams for performance)
+- Head-to-head post-processing uses a simple threshold; may not catch all cases
 
 ## Data Sources
 

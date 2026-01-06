@@ -18,6 +18,10 @@ from .utils import (
     compute_momentum_features,
     compute_elo_rating,
     compute_statistical_features,
+    compute_record_strength,
+    compute_head_to_head,
+    compute_common_opponents,
+    compute_game_control,
     POWER_5_CONFERENCES
 )
 
@@ -64,6 +68,15 @@ def compute_features(
     # Pre-compute team records for efficiency (used by SOS and quality wins)
     team_records = _compute_all_team_records(week_games, season, week)
     
+    # Get comparison teams for common opponents (top teams from previous rankings)
+    comparison_teams = None
+    if previous_rankings_df is not None:
+        prev_week = week - 1 if week > 1 else week
+        comparison_teams = previous_rankings_df[
+            (previous_rankings_df["season"] == season) &
+            (previous_rankings_df["week"] == prev_week)
+        ]["team_id"].tolist()[:25]  # Top 25 for performance
+    
     # Determine if this is final week (championship week)
     # Typically week 15 or 16 for conference championships
     is_final_week = week >= 15
@@ -82,7 +95,8 @@ def compute_features(
                 team_records=team_records,
                 champions_df=champions_df,
                 previous_rankings_df=previous_rankings_df,
-                is_final_week=is_final_week
+                is_final_week=is_final_week,
+                comparison_teams=comparison_teams
             )
             
             # Add target rank if available
@@ -133,7 +147,8 @@ def _compute_team_features(
     team_records: pd.DataFrame,
     champions_df: Optional[pd.DataFrame],
     previous_rankings_df: Optional[pd.DataFrame],
-    is_final_week: bool
+    is_final_week: bool,
+    comparison_teams: Optional[List[str]] = None
 ) -> Dict:
     """
     Compute all features for a single team.
@@ -146,8 +161,10 @@ def _compute_team_features(
     record_features = compute_record_features(games_df, team, season, week)
     features.update(record_features)
     
-    # 2. Strength of Schedule
-    sos_features = compute_sos(games_df, team, season, week, team_records)
+    # 2. Strength of Schedule (enhanced with weighted SOS)
+    sos_features = compute_sos(
+        games_df, team, season, week, team_records, previous_rankings_df
+    )
     features.update(sos_features)
     
     # 3. Quality wins and bad losses
@@ -156,21 +173,43 @@ def _compute_team_features(
     )
     features.update(quality_features)
     
-    # 4. Conference features
+    # 4. Record Strength (2025 committee enhancement)
+    record_strength_features = compute_record_strength(
+        games_df, team, season, week, team_records, previous_rankings_df
+    )
+    features.update(record_strength_features)
+    
+    # 5. Head-to-Head features
+    h2h_features = compute_head_to_head(
+        games_df, team, season, week, previous_rankings_df
+    )
+    features.update(h2h_features)
+    
+    # 6. Common Opponents (simplified - only vs top teams for performance)
+    common_opp_features = compute_common_opponents(
+        games_df, team, season, week, comparison_teams, team_records
+    )
+    features.update(common_opp_features)
+    
+    # 7. Game Control metrics
+    game_control_features = compute_game_control(games_df, team, season, week)
+    features.update(game_control_features)
+    
+    # 8. Conference features
     conf_features = compute_conference_features(
         teams_df, team, season, champions_df, is_final_week
     )
     features.update(conf_features)
     
-    # 5. Momentum features
+    # 9. Momentum features
     momentum_features = compute_momentum_features(games_df, team, season, week)
     features.update(momentum_features)
     
-    # 6. Elo rating
+    # 10. Elo rating
     elo = compute_elo_rating(games_df, team, season, week)
     features["elo_rating"] = elo
     
-    # 7. Statistical features
+    # 11. Statistical features
     stat_features = compute_statistical_features(games_df, team, season, week)
     features.update(stat_features)
     

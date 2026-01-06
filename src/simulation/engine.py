@@ -94,7 +94,160 @@ class SimulationEngine:
         # Generate predictions
         predictions = predict_rankings(features_df, model=self.model)
         
+        # Apply head-to-head post-processing rule
+        # If Team A beat Team B and resumes are similar, rank A above B
+        predictions = self._apply_head_to_head_rule(
+            predictions, updated_games, season, target_week
+        )
+        
         return predictions
+    
+    def _apply_head_to_head_rule(
+        self,
+        rankings_df: pd.DataFrame,
+        games_df: pd.DataFrame,
+        season: int,
+        week: int
+    ) -> pd.DataFrame:
+        """
+        Apply head-to-head post-processing rule.
+        
+        If Team A beat Team B and their predicted scores are close (comparable resumes),
+        ensure A is ranked above B.
+        
+        Args:
+            rankings_df: Predicted rankings DataFrame
+            games_df: Games DataFrame
+            season: Season year
+            week: Week number
+            
+        Returns:
+            Updated rankings DataFrame
+        """
+        if rankings_df.empty:
+            return rankings_df
+        
+        rankings = rankings_df.copy().sort_values("predicted_score")
+        
+        # Get head-to-head results for this season/week
+        season_games = games_df[
+            (games_df["season"] == season) &
+            (games_df["week"] <= week) &
+            (games_df["team_won"].notna())
+        ]
+        
+        # Create head-to-head map: {loser: [winners who beat them]}
+        h2h_map = {}
+        for _, game in season_games.iterrows():
+            if game["team_won"]:
+                winner = game["team"]
+                loser = game["opponent"]
+                if loser not in h2h_map:
+                    h2h_map[loser] = []
+                h2h_map[loser].append(winner)
+        
+        # Check for head-to-head violations
+        # If two teams are close in score (within threshold) and one beat the other,
+        # swap them if needed
+        score_threshold = 0.1  # Teams within 0.1 score are "comparable"
+        
+        for i in range(len(rankings) - 1):
+            team_a = rankings.iloc[i]["team"]
+            team_b = rankings.iloc[i + 1]["team"]
+            score_a = rankings.iloc[i]["predicted_score"]
+            score_b = rankings.iloc[i + 1]["predicted_score"]
+            
+            # Check if scores are close (comparable)
+            if abs(score_a - score_b) <= score_threshold:
+                # Check head-to-head
+                # Did A beat B?
+                if team_b in h2h_map and team_a in h2h_map[team_b]:
+                    # A beat B, but B is ranked higher - swap them
+                    rankings.iloc[i], rankings.iloc[i + 1] = rankings.iloc[i + 1].copy(), rankings.iloc[i].copy()
+                # Did B beat A? (A is already above B, so no swap needed)
+        
+        # Reassign ranks after potential swaps
+        rankings = rankings.sort_values("predicted_score").reset_index(drop=True)
+        rankings["predicted_rank"] = range(1, len(rankings) + 1)
+        
+        return rankings
+    
+    def simulate_weekly_rankings(
+        self,
+        base_games_df: pd.DataFrame,
+        base_teams_df: pd.DataFrame,
+        game_outcomes: Dict[str, str],
+        start_week: int,
+        end_week: int,
+        season: int,
+        base_rankings_df: Optional[pd.DataFrame] = None,
+        champions_df: Optional[pd.DataFrame] = None
+    ) -> Dict[int, pd.DataFrame]:
+        """
+        Simulate rankings week-by-week.
+        
+        Args:
+            base_games_df: Original games DataFrame
+            base_teams_df: Teams DataFrame
+            game_outcomes: Dict mapping game_id to winner
+            start_week: First week to predict
+            end_week: Last week to predict
+            season: Season year
+            base_rankings_df: Optional baseline rankings
+            champions_df: Optional conference champions
+            
+        Returns:
+            Dictionary mapping week -> predicted rankings DataFrame
+        """
+        updated_games = base_games_df.copy()
+        updated_games = self._update_game_outcomes(updated_games, game_outcomes, season)
+        
+        weekly_rankings = {}
+        previous_rankings = base_rankings_df
+        
+        for week in range(start_week, end_week + 1):
+            # Get previous week's rankings for feature computation
+            if previous_rankings is not None:
+                prev_week_rankings = previous_rankings[
+                    (previous_rankings["season"] == season) &
+                    (previous_rankings["week"] == week - 1)
+                ] if week > start_week else None
+            else:
+                prev_week_rankings = None
+            
+            # Compute features for this week
+            features_df = compute_features(
+                season=season,
+                week=week,
+                games_df=updated_games,
+                teams_df=base_teams_df,
+                rankings_df=None,
+                champions_df=champions_df if week >= 15 else None,
+                previous_rankings_df=prev_week_rankings
+            )
+            
+            if features_df.empty:
+                continue
+            
+            # Generate predictions
+            predictions = predict_rankings(features_df, model=self.model)
+            
+            # Apply head-to-head rule
+            predictions = self._apply_head_to_head_rule(
+                predictions, updated_games, season, week
+            )
+            
+            weekly_rankings[week] = predictions
+            
+            # Use this week's predictions as previous week for next iteration
+            previous_rankings = predictions.rename(columns={
+                "predicted_rank": "rank",
+                "team": "team_id"
+            })
+            previous_rankings["season"] = season
+            previous_rankings["week"] = week
+        
+        return weekly_rankings
     
     def _update_game_outcomes(
         self,

@@ -15,7 +15,13 @@ from .utils import (
     run_simulation
 )
 from .components.game_selector import game_selector, conference_championship_selector
-from .components.rankings import display_rankings, display_rankings_comparison
+from .components.rankings import (
+    display_rankings, 
+    display_rankings_comparison,
+    display_team_resume,
+    display_team_comparison,
+    display_feature_importance
+)
 from .components.bracket import display_bracket, display_playoff_summary
 
 # Page configuration
@@ -76,8 +82,19 @@ current_week = get_current_week(season, games_df)
 # Main content
 st.header("Scenario Simulation")
 
+# Mode selector
+simulation_mode = st.radio(
+    "Simulation Mode",
+    options=["Final Rankings", "Weekly Rankings"],
+    horizontal=True,
+    help="Final Rankings: Predict Selection Day outcome. Weekly Rankings: See ranking evolution week-by-week."
+)
+
 # Tabs
-tab1, tab2, tab3 = st.tabs(["Game Selector", "Projected Rankings", "Playoff Bracket"])
+if simulation_mode == "Final Rankings":
+    tab1, tab2, tab3, tab4 = st.tabs(["Game Selector", "Projected Rankings", "Playoff Bracket", "Team Analysis"])
+else:
+    tab1, tab2, tab3, tab4 = st.tabs(["Game Selector", "Weekly Rankings", "Playoff Bracket", "Team Analysis"])
 
 with tab1:
     st.subheader("Select Game Outcomes")
@@ -100,50 +117,111 @@ with tab1:
         )
 
 with tab2:
-    st.subheader("Projected CFP Rankings")
-    
-    if st.button("Run Projection", type="primary"):
-        if not selected_outcomes:
-            st.warning("Please select at least one game outcome.")
-        else:
-            with st.spinner("Computing projections..."):
-                # Run simulation
-                results = run_simulation(
-                    games_df=games_df,
-                    teams_df=teams_df,
-                    game_outcomes=selected_outcomes,
-                    season=season,
-                    target_week=15,  # Final week
-                    model_path=model_path,
-                    champions_df=champions_df
-                )
-                
-                # Store in session state
-                st.session_state["simulation_results"] = results
-                
-                # Display rankings
-                if not results["rankings"].empty:
-                    display_rankings(
-                        rankings_df=results["rankings"],
-                        title="Projected Top 25",
-                        show_features=True,
-                        highlight_playoff=True,
-                        playoff_teams=set(results["playoff_teams"]["team"].values) if not results["playoff_teams"].empty else None
+    if simulation_mode == "Final Rankings":
+        st.subheader("Projected CFP Rankings")
+        
+        if st.button("Run Projection", type="primary"):
+            if not selected_outcomes:
+                st.warning("Please select at least one game outcome.")
+            else:
+                with st.spinner("Computing projections..."):
+                    # Get previous week's rankings for feature computation
+                    prev_week_rankings = None
+                    if not rankings_df.empty and current_week > 1:
+                        prev_week_rankings = rankings_df[
+                            (rankings_df["season"] == season) &
+                            (rankings_df["week"] == current_week - 1)
+                        ]
+                    
+                    # Run simulation
+                    results = run_simulation(
+                        games_df=games_df,
+                        teams_df=teams_df,
+                        game_outcomes=selected_outcomes,
+                        season=season,
+                        target_week=15,  # Final week
+                        model_path=model_path,
+                        champions_df=champions_df,
+                        previous_rankings_df=prev_week_rankings
                     )
-                else:
-                    st.error("Failed to generate rankings.")
+                    
+                    # Store in session state
+                    st.session_state["simulation_results"] = results
+                    st.session_state["simulation_features"] = None  # Will be computed if needed
+                    
+                    # Display rankings
+                    if not results["rankings"].empty:
+                        display_rankings(
+                            rankings_df=results["rankings"],
+                            title="Projected Top 25",
+                            show_features=True,
+                            highlight_playoff=True,
+                            playoff_teams=set(results["playoff_teams"]["team"].values) if not results["playoff_teams"].empty else None
+                        )
+                    else:
+                        st.error("Failed to generate rankings.")
+        
+        # Display stored results if available
+        if "simulation_results" in st.session_state:
+            results = st.session_state["simulation_results"]
+            if not results["rankings"].empty:
+                display_rankings(
+                    rankings_df=results["rankings"],
+                    title="Projected Top 25",
+                    show_features=True,
+                    highlight_playoff=True,
+                    playoff_teams=set(results["playoff_teams"]["team"].values) if not results["playoff_teams"].empty else None
+                )
     
-    # Display stored results if available
-    if "simulation_results" in st.session_state:
-        results = st.session_state["simulation_results"]
-        if not results["rankings"].empty:
-            display_rankings(
-                rankings_df=results["rankings"],
-                title="Projected Top 25",
-                show_features=True,
-                highlight_playoff=True,
-                playoff_teams=set(results["playoff_teams"]["team"].values) if not results["playoff_teams"].empty else None
-            )
+    else:  # Weekly Rankings mode
+        st.subheader("Weekly Ranking Evolution")
+        
+        if st.button("Run Weekly Projection", type="primary"):
+            if not selected_outcomes:
+                st.warning("Please select at least one game outcome.")
+            else:
+                with st.spinner("Computing weekly projections..."):
+                    from ..simulation.engine import SimulationEngine
+                    from ..features.compute import compute_features
+                    
+                    engine = SimulationEngine(model_path=model_path)
+                    
+                    # Get start and end weeks
+                    start_week = st.session_state.get("start_week", current_week + 1)
+                    end_week = st.session_state.get("end_week", 15)
+                    
+                    weekly_results = engine.simulate_weekly_rankings(
+                        base_games_df=games_df,
+                        base_teams_df=teams_df,
+                        game_outcomes=selected_outcomes,
+                        start_week=start_week,
+                        end_week=end_week,
+                        season=season,
+                        base_rankings_df=rankings_df,
+                        champions_df=champions_df
+                    )
+                    
+                    st.session_state["weekly_results"] = weekly_results
+                    
+                    # Display weekly rankings
+                    for week, week_rankings in sorted(weekly_results.items()):
+                        with st.expander(f"Week {week} Rankings"):
+                            display_rankings(
+                                rankings_df=week_rankings,
+                                title=f"Week {week} Top 25",
+                                show_features=False
+                            )
+        
+        # Display stored weekly results
+        if "weekly_results" in st.session_state:
+            weekly_results = st.session_state["weekly_results"]
+            for week, week_rankings in sorted(weekly_results.items()):
+                with st.expander(f"Week {week} Rankings"):
+                    display_rankings(
+                        rankings_df=week_rankings,
+                        title=f"Week {week} Top 25",
+                        show_features=False
+                    )
 
 with tab3:
     st.subheader("Projected Playoff Bracket")
@@ -168,6 +246,66 @@ with tab3:
             st.warning("No playoff teams generated. Run a simulation first.")
     else:
         st.info("Run a simulation in the 'Projected Rankings' tab to see the playoff bracket.")
+
+with tab4:
+    st.subheader("Team Analysis & Feature Transparency")
+    
+    # Feature importance
+    if st.checkbox("Show Feature Importance"):
+        try:
+            from ..model.predict import load_model
+            model = load_model(model_path)
+            if isinstance(model, dict):
+                model = model.get("model", model)
+            
+            # Get feature names from model or use defaults
+            if hasattr(model, 'feature_names_'):
+                feature_names = model.feature_names_
+            else:
+                # Default feature list
+                feature_names = [
+                    "wins", "losses", "win_pct", "sos_score", "weighted_sos_score",
+                    "wins_vs_winning_teams", "wins_vs_top25", "record_strength_score",
+                    "head_to_head_wins_vs_ranked", "is_power5", "is_conference_champion"
+                ]
+            
+            display_feature_importance(model, feature_names)
+        except Exception as e:
+            st.warning(f"Could not load feature importance: {e}")
+    
+    # Team resume view
+    st.write("---")
+    st.write("**View Team Resume**")
+    
+    if "simulation_results" in st.session_state:
+        results = st.session_state["simulation_results"]
+        if not results["rankings"].empty:
+            team_list = results["rankings"]["team"].tolist()
+            selected_team = st.selectbox("Select Team", team_list)
+            
+            if selected_team:
+                # Compute features for this team (would need to recompute or store)
+                st.info("Team resume view requires feature recomputation. Feature coming soon.")
+                # display_team_resume(selected_team, features_df)
+    
+    # Team comparison
+    st.write("---")
+    st.write("**Compare Two Teams**")
+    
+    if "simulation_results" in st.session_state:
+        results = st.session_state["simulation_results"]
+        if not results["rankings"].empty:
+            team_list = results["rankings"]["team"].tolist()
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                team1 = st.selectbox("Team 1", team_list, key="team1")
+            with col2:
+                team2 = st.selectbox("Team 2", team_list, key="team2")
+            
+            if team1 and team2 and team1 != team2:
+                st.info("Team comparison requires feature recomputation. Feature coming soon.")
+                # display_team_comparison(team1, team2, features_df)
 
 # Footer
 st.write("---")

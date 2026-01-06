@@ -84,7 +84,8 @@ def run_simulation(
     season: int,
     target_week: int,
     model_path: Optional[Path] = None,
-    champions_df: Optional[pd.DataFrame] = None
+    champions_df: Optional[pd.DataFrame] = None,
+    previous_rankings_df: Optional[pd.DataFrame] = None
 ) -> Dict[str, pd.DataFrame]:
     """
     Run a complete simulation and return results.
@@ -97,6 +98,7 @@ def run_simulation(
         target_week: Target week for projection
         model_path: Optional model path
         champions_df: Optional champions DataFrame
+        previous_rankings_df: Optional previous week's rankings
         
     Returns:
         Dictionary with keys: rankings, playoff_teams, matchups
@@ -111,7 +113,8 @@ def run_simulation(
         game_outcomes=game_outcomes,
         target_week=target_week,
         season=season,
-        champions_df=champions_df
+        champions_df=champions_df,
+        previous_rankings_df=previous_rankings_df
     )
     
     if rankings.empty:
