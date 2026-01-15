@@ -2,6 +2,10 @@
 
 A machine learning system that predicts College Football Playoff (CFP) committee rankings and enables "what-if" scenario simulations. The system uses historical committee rankings (2014-2023) to train a gradient boosting model that emulates committee decision-making.
 
+## Project Status
+
+Work-in-progress portfolio project focused on (1) an end-to-end ML pipeline and (2) an interactive scenario simulator. The current UI is a Streamlit app; see `ROADMAP.md` for options if you want a more design-forward frontend.
+
 ## Features
 
 - **Historical Data Integration**: Fetches game results, rankings, and team metadata from the CollegeFootballData API
@@ -9,6 +13,14 @@ A machine learning system that predicts College Football Playoff (CFP) committee
 - **ML Model**: Trained XGBoost/LightGBM model predicts committee rankings
 - **Scenario Simulation**: Interactive tool to simulate game outcomes and see projected rankings
 - **12-Team Playoff Support**: Implements the new 12-team playoff format rules (auto-bids, seeding)
+
+## Documentation
+
+- `PROJECT_SUMMARY.md`: architecture + how the pipeline fits together
+- `RESEARCH.md`: research + modeling rationale
+- `ENHANCEMENTS_SUMMARY.md`: implemented feature upgrades
+- `ROADMAP.md`: next steps + suggested technologies
+- `RESUME_NOTES.md`: resume-ready bullet ideas + keywords
 
 ## Project Structure
 
@@ -34,7 +46,7 @@ CFB/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.8+ (use `python3` on macOS)
 - CFBD API key (get one at [collegefootballdata.com](https://collegefootballdata.com))
 - **macOS users**: OpenMP runtime (required for XGBoost)
   ```bash
@@ -51,7 +63,7 @@ cd CFB
 
 2. Create a virtual environment:
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
@@ -80,7 +92,7 @@ cp .env.example .env
 First, train the model on historical data:
 
 ```bash
-python -m src.model.train
+python3 -m src.model.train
 ```
 
 This will:
@@ -90,6 +102,36 @@ This will:
 - Save the model to `data/models/cfp_predictor.pkl`
 
 ### Running the Web Application
+
+#### Option 1: Next.js Frontend (Recommended)
+
+1. **Start the FastAPI backend:**
+   ```bash
+   cd api
+   pip install -r requirements.txt
+   uvicorn main:app --reload --port 8000
+   ```
+
+2. **Start the Next.js frontend:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. Open `http://localhost:3000` in your browser.
+
+The frontend provides:
+- Interactive bracket visualization
+- Rankings table with team information
+- Game outcome selector for simulations
+- "The Bubble" showing teams on the cusp
+
+**Environment Variables:**
+- Frontend: Set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` (defaults to `http://localhost:8000`)
+- Backend: Configure CORS origins in `api/main.py` or via environment variables
+
+#### Option 2: Streamlit App (Legacy)
 
 Launch the Streamlit app:
 
@@ -169,7 +211,7 @@ The model uses resume-based features that align with CFP committee criteria:
 Run unit tests:
 
 ```bash
-pytest tests/
+python3 -m pytest tests/
 ```
 
 ## Limitations
@@ -188,14 +230,13 @@ pytest tests/
 
 ## License
 
-[Add your license here]
+No license selected yet (WIP).
 
 ## Contributing
 
-[Add contribution guidelines here]
+Open an issue/PR with a clear description and reproduction steps (WIP).
 
 ## Acknowledgments
 
 - CollegeFootballData for providing the API
 - FiveThirtyEight for methodology insights on CFP prediction
-

@@ -31,16 +31,35 @@ def load_current_season_data(
     fetcher = CFBDFetcher()
     processor = DataProcessor()
     
-    # Fetch current season data
-    games = fetcher.fetch_games(season, season_type="regular")
-    teams = fetcher.fetch_teams(season)
-    rankings = fetcher.fetch_rankings(season)
-    champions = fetcher.fetch_conference_champions(season)
+    # Fetch current season data with error handling
+    try:
+        games = fetcher.fetch_games(season, season_type="regular")
+    except Exception as e:
+        print(f"Warning: Failed to fetch games for {season}: {e}")
+        games = pd.DataFrame()
+    
+    try:
+        teams = fetcher.fetch_teams(season)
+    except Exception as e:
+        print(f"Warning: Failed to fetch teams for {season}: {e}")
+        teams = pd.DataFrame()
+    
+    try:
+        rankings = fetcher.fetch_rankings(season)
+    except Exception as e:
+        print(f"Warning: Failed to fetch rankings for {season}: {e}")
+        rankings = pd.DataFrame()
+    
+    try:
+        champions = fetcher.fetch_conference_champions(season)
+    except Exception as e:
+        print(f"Warning: Failed to fetch champions for {season}: {e}")
+        champions = pd.DataFrame()
     
     # Process
-    games_df = processor.process_games(games)
-    teams_df = processor.process_teams(teams)
-    rankings_df = processor.process_rankings(rankings)
+    games_df = processor.process_games(games) if not games.empty else pd.DataFrame()
+    teams_df = processor.process_teams(teams) if not teams.empty else pd.DataFrame()
+    rankings_df = processor.process_rankings(rankings) if not rankings.empty else pd.DataFrame()
     champions_df = processor.process_champions(champions) if not champions.empty else pd.DataFrame()
     
     return {

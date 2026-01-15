@@ -8,13 +8,15 @@ The model training completed successfully! Here's what the results mean:
 1. **Model Trained Successfully**: The XGBoost model completed training and was saved to `data/models/cfp_predictor.pkl`
 
 2. **Top-N Accuracy (Most Important)**:
-   - **Top-4 Accuracy**: 100% on validation set! 🎉
-     - This means the model correctly identified all 4 playoff teams in the validation period
-   - **Top-25 Accuracy**: 83.3% on validation
-     - The model gets 83% of the Top 25 teams correct
+   - This metric is “Top-N overlap” (set overlap between predicted Top N and actual Top N).
+   - The bundled model reports approximately:
+     - **Top-4 Accuracy**: ~66.7% on validation
+     - **Top-12 Accuracy**: ~80% on validation
+     - **Top-25 Accuracy**: ~83.3% on validation
 
 3. **Training Data**: 
-   - 22,822 team-week samples with 32 features
+   - ~22k team-week samples
+   - ~40+ engineered features (varies as features evolve)
    - Good dataset size for training
 
 ## Areas of Concern ⚠️
@@ -34,7 +36,7 @@ The model training completed successfully! Here's what the results mean:
 
 ## What This Means
 
-**The model is doing well at identifying WHO should be in the playoff (Top-4 accuracy = 100%), but it's struggling with the exact ORDERING of teams within the rankings.**
+**The model is doing well at identifying WHO should be in the playoff/top field (Top-N overlap), but it's struggling with the exact ORDERING of teams within the rankings.**
 
 This is actually somewhat expected because:
 - The CFP committee's decisions have subjective elements
@@ -43,7 +45,7 @@ This is actually somewhat expected because:
 
 ## Recommendations
 
-1. **The model is usable** - Top-4 accuracy of 100% means it can identify playoff teams correctly
+1. **The model is usable** - Top-N overlap performance is strong enough for scenario exploration
 2. **For exact rankings**, the model may need:
    - More training data
    - Feature engineering improvements
@@ -52,4 +54,4 @@ This is actually somewhat expected because:
 
 ## Next Steps
 
-The model is ready to use for scenario simulation! The high Top-4 accuracy means it should do well at predicting which teams make the playoff, which is the main goal of the tool.
+The model is ready to use for scenario simulation; if you retrain, snapshot the metrics you care about and define them clearly (Top-N overlap vs. exact ordering).

@@ -67,3 +67,4 @@ def test_generate_bracket(sample_rankings, sample_champions):
     assert not bracket.empty
     assert "round" in bracket.columns
 
+

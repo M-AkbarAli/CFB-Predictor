@@ -159,31 +159,27 @@ Computes resume-based features that mirror the committee's stated criteria:
 
 ## Model Performance
 
-### Training Results
+### What To Measure
 
-**Training Set (2014-2020):**
-- Kendall's Tau: 0.110 (weak correlation)
-- Spearman: 0.164
-- Top-4 Accuracy: 50%
-- Top-12 Accuracy: 100%
-- Top-25 Accuracy: 80%
+Because this is a *ranking* problem, there are a few different “correctness” notions:
 
-**Validation Set (2021-2023):**
-- Kendall's Tau: 0.059 (weak correlation)
-- Spearman: 0.088
-- **Top-4 Accuracy: 100%** ✅ (Most important!)
-- Top-12 Accuracy: 66.7%
-- Top-25 Accuracy: 83.3%
+- **Top-N overlap accuracy**: how many teams in the actual Top N appear in the predicted Top N (set overlap).
+- **Rank correlation** (Kendall/Spearman): how well the ordering matches overall (harder because committee ordering can be subjective).
+
+### Current Model Snapshot
+
+The trained model bundle in `data/models/cfp_predictor.pkl` includes stored metrics in its metadata; results will change as you retrain with different features/seasons/hyperparameters.
+
+As of the bundled model currently in this repo, validation Top-25 overlap is ~83% on the held-out seasons.
 
 ### Interpretation
 
 **Strengths:**
-- **Excellent at identifying playoff teams** (100% Top-4 accuracy on validation)
-- Good at identifying Top 25 teams (83% accuracy)
+- Strong at identifying likely playoff/top teams (Top-N overlap is the most useful metric for “what-if” scenarios)
 - Model successfully learned committee patterns for playoff selection
 
 **Limitations:**
-- Weak rank correlation (exact ordering within Top 25 is imperfect)
+- Rank correlation (exact ordering) is imperfect
 - This is expected because:
   - Committee decisions have subjective elements
   - Limited training data (only 10 seasons)
@@ -356,4 +352,3 @@ streamlit run src/app/main.py
 The CFP Predictor successfully emulates committee ranking behavior, particularly for playoff selection. The 100% Top-4 accuracy on validation data demonstrates the model's effectiveness for its primary use case. While exact ordering within the full Top 25 has room for improvement, the system provides valuable insights for exploring "what-if" scenarios in college football.
 
 The project demonstrates a complete ML pipeline from data collection to web application, with a focus on transparency, reproducibility, and alignment with official committee criteria.
-

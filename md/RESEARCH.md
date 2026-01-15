@@ -424,3 +424,4 @@ Ultimately, while our model can't read the minds of committee members, it can pr
 - CollegeFootballData.com API information (data source for games and rankings)
 - User-provided project outline for feature and model design, confirming feasibility and approach
 
+

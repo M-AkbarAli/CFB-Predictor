@@ -15,8 +15,9 @@ import requests
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from project root
+project_root = Path(__file__).parent.parent.parent
+load_dotenv(project_root / ".env")
 
 # Base URL for CFBD API
 CFBD_BASE_URL = "https://api.collegefootballdata.com"
@@ -75,6 +76,21 @@ class CFBDFetcher:
         try:
             time.sleep(self.rate_limit_delay)  # Rate limiting
             response = self.session.get(url, params=params)
+            
+            # Handle 401 Unauthorized specifically
+            if response.status_code == 401:
+                # Check if we have cached data to fall back to
+                if self.use_cache and cache_file.exists():
+                    print(f"Warning: API returned 401 Unauthorized for {endpoint}. Using cached data.")
+                    with open(cache_file, 'r') as f:
+                        return json.load(f)
+                else:
+                    raise Exception(
+                        f"API request failed for {endpoint}: 401 Unauthorized. "
+                        f"This may indicate your API key doesn't have access to this data, "
+                        f"or the API key is invalid. Check your CFBD_API_KEY environment variable."
+                    )
+            
             response.raise_for_status()
             data = response.json()
             
@@ -85,6 +101,14 @@ class CFBDFetcher:
             
             return data
         except requests.exceptions.RequestException as e:
+            # Check if we have cached data as fallback
+            if self.use_cache and cache_file.exists():
+                print(f"Warning: API request failed for {endpoint}: {str(e)}. Using cached data.")
+                try:
+                    with open(cache_file, 'r') as f:
+                        return json.load(f)
+                except:
+                    pass
             raise Exception(f"API request failed for {endpoint}: {str(e)}")
     
     def _get_cache_key(self, endpoint: str, params: Optional[Dict] = None) -> str:

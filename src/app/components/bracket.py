@@ -160,3 +160,4 @@ def display_playoff_summary(
                 f"received auto-bids: {', '.join(low_rank_auto['team'].values)}"
             )
 
+

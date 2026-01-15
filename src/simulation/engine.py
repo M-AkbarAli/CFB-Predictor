@@ -11,7 +11,7 @@ from typing import Dict, Optional, List
 from pathlib import Path
 
 from ..features.compute import compute_features
-from ..model.predict import predict_rankings, load_model
+from ..model.predict import predict_rankings, load_model_bundle
 
 
 class SimulationEngine:
@@ -30,16 +30,19 @@ class SimulationEngine:
             model_path: Path to trained model. If None, uses default location.
         """
         self.model = None
+        self.model_bundle = None
         self.model_path = model_path
         self._load_model()
     
     def _load_model(self):
         """Load the trained model."""
         try:
-            self.model = load_model(self.model_path)
+            self.model_bundle = load_model_bundle(self.model_path)
+            self.model = self.model_bundle["model"]
         except FileNotFoundError:
             print("Warning: Model not found. Simulation will not work until model is trained.")
             self.model = None
+            self.model_bundle = None
     
     def simulate_scenario(
         self,
@@ -92,7 +95,7 @@ class SimulationEngine:
             return pd.DataFrame()
         
         # Generate predictions
-        predictions = predict_rankings(features_df, model=self.model)
+        predictions = predict_rankings(features_df, model=self.model_bundle, model_path=self.model_path)
         
         # Apply head-to-head post-processing rule
         # If Team A beat Team B and resumes are similar, rank A above B
@@ -230,7 +233,7 @@ class SimulationEngine:
                 continue
             
             # Generate predictions
-            predictions = predict_rankings(features_df, model=self.model)
+            predictions = predict_rankings(features_df, model=self.model_bundle, model_path=self.model_path)
             
             # Apply head-to-head rule
             predictions = self._apply_head_to_head_rule(
@@ -373,4 +376,3 @@ def simulate_scenario(
         season=season,
         champions_df=champions_df
     )
-
